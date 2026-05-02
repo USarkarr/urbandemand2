@@ -12,6 +12,214 @@
 
   <style>
     body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+
+    h2 { margin-bottom: 10px; }
+
+    select {
+      padding: 10px;
+      margin: 10px 0 20px 0;
+      font-size: 16px;
+      border-radius: 6px;
+    }
+
+    .chart-container {
+      width: 780px;
+      margin: auto;
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 520px !important;
+    }
+
+    .gap-box {
+      margin-top: 15px;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 16px;
+      display: inline-block;
+    }
+
+    .high-gap { background: #ffcccc; color: #a10000; }
+    .medium-gap { background: #fff3cd; color: #8a6d3b; }
+    .low-gap { background: #d4edda; color: #155724; }
+  </style>
+
+</head>
+
+<body>
+
+<h2>Urban Infrastructure Accessibility</h2>
+
+<select id="gridSelect"></select>
+
+<div class="chart-container">
+  <canvas id="radarChart"></canvas>
+  <div id="gapBox" class="gap-box"></div>
+</div>
+
+<script>
+let chart;
+let allData = [];
+let maxValues = {};
+
+Papa.parse("5buffer.csv", {
+  download: true,
+  header: true,
+  complete: function(results) {
+
+    allData = results.data.filter(d => d.GRID_ID);
+
+    // --- Compute max for normalization ---
+    maxValues = {
+      road: Math.max(...allData.map(d => parseFloat(d.sum_Road_l || 0))),
+      transp: Math.max(...allData.map(d => parseFloat(d.sum_Transp || 0))),
+      school: Math.max(...allData.map(d => parseFloat(d.School_Nos || 0))),
+      health: Math.max(...allData.map(d => parseFloat(d.sum_Health || 0)))
+    };
+
+    const gridSelect = document.getElementById("gridSelect");
+
+    // Add ALL option
+    let optAll = document.createElement("option");
+    optAll.value = "all";
+    optAll.text = "All Grids";
+    gridSelect.appendChild(optAll);
+
+    // Add grids
+    allData.forEach((row, index) => {
+      let opt = document.createElement("option");
+      opt.value = index;
+      opt.text = row.GRID_ID;
+      gridSelect.appendChild(opt);
+    });
+
+    gridSelect.value = "all";
+    updateChart("all");
+
+    gridSelect.addEventListener("change", function() {
+      updateChart(this.value);
+    });
+  }
+});
+
+function normalize(val, max) {
+  return max === 0 ? 0 : val / max;
+}
+
+function updateChart(index) {
+
+  let values;
+
+  if (index === "all") {
+    let road=0, transp=0, school=0, health=0;
+
+    allData.forEach(row => {
+      road += parseFloat(row.sum_Road_l || 0);
+      transp += parseFloat(row.sum_Transp || 0);
+      school += parseFloat(row.School_Nos || 0);
+      health += parseFloat(row.sum_Health || 0);
+    });
+
+    values = [
+      normalize(road, maxValues.road * allData.length),
+      normalize(transp, maxValues.transp * allData.length),
+      normalize(school, maxValues.school * allData.length),
+      normalize(health, maxValues.health * allData.length)
+    ];
+
+  } else {
+    const row = allData[index];
+
+    values = [
+      normalize(parseFloat(row.sum_Road_l || 0), maxValues.road),
+      normalize(parseFloat(row.sum_Transp || 0), maxValues.transp),
+      normalize(parseFloat(row.School_Nos || 0), maxValues.school),
+      normalize(parseFloat(row.sum_Health || 0), maxValues.health)
+    ];
+  }
+
+  // --- Accessibility Gap Index ---
+  const avg = values.reduce((a,b)=>a+b,0)/values.length;
+  const gap = 1 - avg;
+
+  // --- Update Gap UI ---
+  const gapBox = document.getElementById("gapBox");
+
+  let category, className;
+
+  if (gap > 0.66) {
+    category = "High Gap (Underserved)";
+    className = "high-gap";
+  } else if (gap > 0.33) {
+    category = "Moderate Gap";
+    className = "medium-gap";
+  } else {
+    category = "Low Gap (Well Served)";
+    className = "low-gap";
+  }
+
+  gapBox.className = "gap-box " + className;
+  gapBox.innerHTML = `Accessibility Gap Index: ${gap.toFixed(2)} → ${category}`;
+
+  // --- Chart ---
+  if (chart) chart.destroy();
+
+  chart = new Chart(document.getElementById('radarChart'), {
+    type: 'radar',
+    data: {
+      labels: ['Roads', 'Transport', 'Schools', 'Hospitals'],
+      datasets: [{
+        label: index === "all" ? "All Grids" : allData[index].GRID_ID,
+        data: values,
+        borderWidth: 2,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' }
+      },
+      scales: {
+        r: {
+          beginAtZero: true,
+          max: 1,
+          ticks: { backdropColor: 'transparent' },
+          pointLabels: { font: { size: 14 } }
+        }
+      }
+    }
+  });
+}
+</script>
+
+</body>
+</html>
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>Urban Demand Dashboard</title>
+
+  <!-- Libraries -->
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+
+  <style>
+    body {
       font-family: Arial;
       text-align: center;
       background: #f5f5f5;
