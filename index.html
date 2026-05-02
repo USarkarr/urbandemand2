@@ -54,11 +54,19 @@ Papa.parse("5buffer.csv", {
     const gridSelect = document.getElementById("gridSelect");
 
     allData.forEach((row, index) => {
-      const option = document.createElement("option");
-      option.value = index;
-      option.text = row.GRID_ID;
-      gridSelect.appendChild(option);
-    });
+      // Add "All" option first
+const allOption = document.createElement("option");
+allOption.value = "all";
+allOption.text = "All Grids";
+gridSelect.appendChild(allOption);
+
+// Then add individual grids
+allData.forEach((row, index) => {
+  const option = document.createElement("option");
+  option.value = index;
+  option.text = row.GRID_ID;
+  gridSelect.appendChild(option);
+});
 
     updateChart(0);
 
