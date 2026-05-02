@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <title>Urban Demand Dashboard</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+
+    select {
+      padding: 8px;
+      margin-bottom: 20px;
+      font-size: 16px;
+    }
+
+    canvas {
+      max-width: 600px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+    }
+  </style>
+
+</head>
+<body>
+
+<h2>Urban Infrastructure Demand</h2>
+
+<select id="gridSelect"></select>
+
+<canvas id="radarChart"></canvas>
+
+<script>
+let chart;
+let allData = [];
+
+Papa.parse("5buffer.csv", {
+  download: true,
+  header: true,
+  complete: function(results) {
+
+    allData = results.data.filter(d => d.GRID_ID);
+
+    const gridSelect = document.getElementById("gridSelect");
+
+    allData.forEach((row, index) => {
+      const option = document.createElement("option");
+      option.value = index;
+      option.text = row.GRID_ID;
+      gridSelect.appendChild(option);
+    });
+
+    updateChart(0);
+
+    gridSelect.addEventListener("change", function() {
+      updateChart(this.value);
+    });
+  }
+});
+
+function updateChart(index) {
+
+  const row = allData[index];
+
+  const values = [
+    parseFloat(row.sum_Road_l || 0),
+    parseFloat(row.sum_Transp || 0),
+    parseFloat(row.School_Nos || 0),
+    parseFloat(row.sum_Health || 0)
+  ];
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(document.getElementById('radarChart'), {
+    type: 'radar',
+    data: {
+      labels: ['Roads', 'Transport', 'Schools', 'Hospitals'],
+      datasets: [{
+        label: row.GRID_ID,
+        data: values
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        r: { beginAtZero: true }
+      }
+    }
+  });
+}
+</script>
+
+</body>
+</html>
