@@ -80,9 +80,20 @@
 <h2>Urban Infrastructure Accessibility</h2>
 
 <div class="controls">
-  <input type="text" id="searchBox" placeholder="Type GRID ID..." onkeyup="filterGrid()">
-  <select id="gridSelect"></select>
-  <button id="modeBtn" onclick="toggleMode()">Switch to Availability</button>
+  <input type="text" id="searchBox" placeholder="Search GRID ID..." onkeyup="filterGrid()">
+
+<select id="gridSelect"></select>
+
+  <select id="directionFilter" onchange="applyDirectionFilter()">
+    <option value="all">All Directions</option>
+    <option value="North_East">North_East</option>
+    <option value="North_West">North_West</option>
+    <option value="South_East">South_East</option>
+    <option value="South_West">South_West</option>
+  </select>
+
+<button id="modeBtn" onclick="toggleMode()">Switch to Availability</button>
+
 </div>
 
 <div class="chart-container">
@@ -98,6 +109,7 @@
 <script>
 let chart;
 let allData = [];
+let filteredData = [];
 let maxValues = {};
 let mode = "deficit";
 
@@ -107,6 +119,7 @@ Papa.parse("5buffer.csv", {
   complete: function(results) {
 
     allData = results.data.filter(d => d.GRID_ID);
+    filteredData = [...allData];
 
     const safeMax = arr => {
       const m = Math.max(...arr);
@@ -120,30 +133,48 @@ Papa.parse("5buffer.csv", {
       health: safeMax(allData.map(d => parseFloat(d.sum_Health)||0))
     };
 
-    const sel = document.getElementById("gridSelect");
-
-    let optAll = document.createElement("option");
-    optAll.value = "all";
-    optAll.text = "All Grids";
-    sel.appendChild(optAll);
-
-    allData.forEach((row, i)=>{
-      let opt = document.createElement("option");
-      opt.value = i;
-      opt.text = row.GRID_ID;
-      sel.appendChild(opt);
-    });
-
-    sel.value = "all";
-
+    populateDropdown(filteredData);
     generateRanking();
     updateChart("all");
-
-    sel.addEventListener("change", function(){
-      updateChart(this.value);
-    });
   }
 });
+
+function populateDropdown(data){
+  const sel = document.getElementById("gridSelect");
+  sel.innerHTML = "";
+
+  let optAll = document.createElement("option");
+  optAll.value = "all";
+  optAll.text = "All Grids";
+  sel.appendChild(optAll);
+
+  data.forEach((row, i)=>{
+    let opt = document.createElement("option");
+    opt.value = i;
+    opt.text = row.GRID_ID;
+    sel.appendChild(opt);
+  });
+
+  sel.value = "all";
+
+  sel.onchange = function(){
+    updateChart(this.value);
+  };
+}
+
+function applyDirectionFilter(){
+  const dir = document.getElementById("directionFilter").value;
+
+  if(dir === "all"){
+    filteredData = [...allData];
+  } else {
+    filteredData = allData.filter(d => d.Direction === dir);
+  }
+
+  populateDropdown(filteredData);
+  generateRanking();
+  updateChart("all");
+}
 
 function normalize(v, max){
   if(!isFinite(v) || max===0) return 0;
@@ -156,6 +187,7 @@ function logNorm(v, max){
 
 function toggleMode(){
   mode = (mode === "availability") ? "deficit" : "availability";
+
   document.getElementById("modeBtn").innerText =
     mode === "deficit" ? "Switch to Availability" : "Switch to Deficit";
 
@@ -177,7 +209,7 @@ function computeGap(values){
 }
 
 function generateRanking(){
-  let ranked = allData.map(row=>{
+  let ranked = filteredData.map(row=>{
     const vals = computeValues(row);
     return {id: row.GRID_ID, gap: computeGap(vals)};
   });
@@ -200,13 +232,13 @@ function updateChart(index){
 
   if(index==="all"){
     let sum = [0,0,0,0];
-    allData.forEach(r=>{
+    filteredData.forEach(r=>{
       let v = computeValues(r);
       sum = sum.map((s,i)=>s+v[i]);
     });
-    values = sum.map(v=>v/allData.length);
+    values = sum.map(v=>v/filteredData.length);
   } else {
-    values = computeValues(allData[index]);
+    values = computeValues(filteredData[index]);
   }
 
   if(mode==="deficit"){
@@ -230,7 +262,7 @@ function updateChart(index){
     data:{
       labels:["Roads","Transport","Schools","Hospitals"],
       datasets:[{
-        label: index==="all"?"All Grids":allData[index].GRID_ID,
+        label: index==="all"?"All Grids":filteredData[index].GRID_ID,
         data: values,
         backgroundColor: mode==="deficit" ? "rgba(255,0,0,0.2)" : "rgba(0,123,255,0.2)",
         borderColor: mode==="deficit" ? "red" : "blue",
