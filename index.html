@@ -4,6 +4,8 @@
 <head>
   <title>Urban Demand Dashboard</title>
 
+  <!-- Libraries -->
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
@@ -16,29 +18,43 @@
       padding: 20px;
     }
 
-    select {
-      padding: 8px;
+    h2 {
       margin-bottom: 20px;
+    }
+
+    select {
+      padding: 10px;
+      margin-bottom: 25px;
       font-size: 16px;
+      border-radius: 5px;
+    }
+
+    .chart-container {
+      width: 750px;
+      margin: auto;
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
 
     canvas {
-      max-width: 600px;
-      margin: auto;
-      background: white;
-      padding: 20px;
-      border-radius: 10px;
+      width: 100% !important;
+      height: 500px !important; /* bigger chart */
     }
   </style>
 
 </head>
+
 <body>
 
 <h2>Urban Infrastructure Demand</h2>
 
 <select id="gridSelect"></select>
 
-<canvas id="radarChart"></canvas>
+<div class="chart-container">
+  <canvas id="radarChart"></canvas>
+</div>
 
 <script>
 let chart;
@@ -53,22 +69,23 @@ Papa.parse("5buffer.csv", {
 
     const gridSelect = document.getElementById("gridSelect");
 
+    // Add "All Grids" option
+    const allOption = document.createElement("option");
+    allOption.value = "all";
+    allOption.text = "All Grids";
+    gridSelect.appendChild(allOption);
+
+    // Add individual grids
     allData.forEach((row, index) => {
-      // Add "All" option first
-const allOption = document.createElement("option");
-allOption.value = "all";
-allOption.text = "All Grids";
-gridSelect.appendChild(allOption);
+      const option = document.createElement("option");
+      option.value = index;
+      option.text = row.GRID_ID;
+      gridSelect.appendChild(option);
+    });
 
-// Then add individual grids
-allData.forEach((row, index) => {
-  const option = document.createElement("option");
-  option.value = index;
-  option.text = row.GRID_ID;
-  gridSelect.appendChild(option);
-});
-
-    updateChart(0);
+    // Default = All Grids
+    gridSelect.value = "all";
+    updateChart("all");
 
     gridSelect.addEventListener("change", function() {
       updateChart(this.value);
@@ -78,14 +95,32 @@ allData.forEach((row, index) => {
 
 function updateChart(index) {
 
-  const row = allData[index];
+  let values;
 
-  const values = [
-    parseFloat(row.sum_Road_l || 0),
-    parseFloat(row.sum_Transp || 0),
-    parseFloat(row.School_Nos || 0),
-    parseFloat(row.sum_Health || 0)
-  ];
+  if (index === "all") {
+
+    let road = 0, transp = 0, school = 0, health = 0;
+
+    allData.forEach(row => {
+      road += parseFloat(row.sum_Road_l || 0);
+      transp += parseFloat(row.sum_Transp || 0);
+      school += parseFloat(row.School_Nos || 0);
+      health += parseFloat(row.sum_Health || 0);
+    });
+
+    values = [road, transp, school, health];
+
+  } else {
+
+    const row = allData[index];
+
+    values = [
+      parseFloat(row.sum_Road_l || 0),
+      parseFloat(row.sum_Transp || 0),
+      parseFloat(row.School_Nos || 0),
+      parseFloat(row.sum_Health || 0)
+    ];
+  }
 
   if (chart) chart.destroy();
 
@@ -94,14 +129,31 @@ function updateChart(index) {
     data: {
       labels: ['Roads', 'Transport', 'Schools', 'Hospitals'],
       datasets: [{
-        label: row.GRID_ID,
-        data: values
+        label: index === "all" ? "All Grids" : allData[index].GRID_ID,
+        data: values,
+        fill: true,
+        borderWidth: 2
       }]
     },
     options: {
       responsive: true,
+      plugins: {
+        legend: {
+          position: 'top'
+        }
+      },
       scales: {
-        r: { beginAtZero: true }
+        r: {
+          beginAtZero: true,
+          pointLabels: {
+            font: {
+              size: 14
+            }
+          },
+          ticks: {
+            backdropColor: 'transparent'
+          }
+        }
       }
     }
   });
